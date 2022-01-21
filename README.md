@@ -32,4 +32,4 @@ func ExerciseLogging() {
 ```
 
 ### Note
-Derived from https://github.com/rohanthewiz/serr
+This is a newer take on https://github.com/rohanthewiz/serr
