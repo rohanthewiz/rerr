@@ -1,0 +1,93 @@
+package rerr
+
+import (
+	"errors"
+	"fmt"
+	"testing"
+)
+
+func TestRErr(t *testing.T) {
+	const strErr1 = "Ok. This is a test err"
+	// todo: constantize most test literals
+
+	fmt.Println("Testing RErr")
+
+	// We should safely ignore a nil err
+	ret := Wrap(nil, "We should be able to handle a nil error without crashing")
+	if ret != nil {
+		t.Error("We should return a nil when a nil error is wrapped", "got:", ret)
+	}
+
+	ber := New(strErr1, "thing1", "thing1val", "thing2", "thing2val")
+	if ber.Error() != strErr1 {
+		t.Errorf("Expected custom error to contain '%s', got '%s'", strErr1, ber.Error())
+		t.FailNow()
+	}
+	if _, ok := ber.(RErr); !ok {
+		t.Error("ber should be a RErr")
+		t.FailNow()
+	}
+
+	// Add some fields to an existing bErr
+	err := Wrap(ber, "thing2", "thing2NewVal")
+	se, ok := err.(RErr)
+	if !ok {
+		t.Error("Wrap should return an error containing a concrete RErr type")
+	} else {
+		// Test RErr#GetError
+		strErr := se.GetError().Error()
+		if strErr != strErr1 {
+			t.Errorf(`Expected wrapped error string to be "%s", got "%s"`, strErr1, strErr)
+		}
+
+		// Test RErr#Fields
+		strFlds := se.Fields()
+		fmt.Printf("[Debug] strFlds: %#v; Immediate location: %s\n", strFlds, FunctionLoc(FuncLevel1)) // debug
+		if len(strFlds) != 14 {
+			t.Error("Expected length of RErr.Fields() to be 14, got", len(strFlds))
+		}
+
+		// Test RErr#FieldsMap
+		mapFlds := se.FieldsMap()
+		if len(mapFlds) != 4 {
+			t.Error("Expected length of RErr.MapFlds() to be 4, got", len(mapFlds))
+			t.FailNow()
+		}
+
+		if val, ok := mapFlds["thing1"]; ok {
+			if val != "thing1val" {
+				t.Errorf("Expected thing1 to be 'thing1Val', got '%s'", val)
+			}
+		} else {
+			t.Error("mapFlds should contain the key: thing1")
+		}
+
+		if val, ok := mapFlds["thing2"]; ok {
+			if val != "thing2NewVal - thing2val" {
+				t.Errorf("Expected thing2 to be 'thing2NewVal - thing2val', got '%s'", val)
+			}
+		} else {
+			t.Error("mapFlds should contain the key: thing2")
+		}
+	}
+
+	// We should be able to wrap with a single field which becomes `"msg": field`
+	const thisIsMyMessage = "This is my message"
+	er := Wrap(errors.New(strErr1), thisIsMyMessage)
+	se, ok = er.(RErr)
+	if !ok {
+		t.Error("er should be a RErr")
+		t.FailNow()
+	}
+	sl := se.Fields()
+	if len(sl) != 6 {
+		t.Error("Structured error from an error wrapped with a single field should contain 6 fields, got", len(sl))
+	}
+	if len(sl) > 0 && sl[0] != "msg" {
+		t.Error("Structured error from an error wrapped with a single field should have 'map' as the first field")
+	}
+	if len(sl) > 1 && sl[1] != thisIsMyMessage {
+		t.Errorf(`The structured error should have "%s" as the second field, got "%s"`, thisIsMyMessage, sl[1])
+		fmt.Println()
+	}
+}
